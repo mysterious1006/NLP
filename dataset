@@ -1,0 +1,143 @@
+import random
+import pandas as pd
+
+random.seed(42)
+
+# -----------------------------
+# Configuration
+# -----------------------------
+TOTAL_EMAILS = 5400
+CLAIM_TYPES = ["Health", "Vehicle", "Property", "Life", "Travel", "Fraud"]
+
+URGENCY_MAP = {
+    "Health": ["High", "Medium"],
+    "Vehicle": ["Medium", "High"],
+    "Property": ["High", "Medium"],
+    "Life": ["High"],
+    "Travel": ["Medium", "Low"],
+    "Fraud": ["High"]
+}
+
+FRAUD_FLAG = {
+    "Fraud": "Yes",
+    "Health": "No",
+    "Vehicle": "No",
+    "Property": "No",
+    "Life": "No",
+    "Travel": "No"
+}
+
+# -----------------------------
+# Templates
+# -----------------------------
+SUBJECT_TEMPLATES = {
+    "Health": [
+        "Medical reimbursement request",
+        "Hospitalization claim submission",
+        "Health insurance claim for treatment"
+    ],
+    "Vehicle": [
+        "Car accident insurance claim",
+        "Vehicle damage claim request",
+        "Motor insurance accident intimation"
+    ],
+    "Property": [
+        "Property damage insurance claim",
+        "Fire accident claim",
+        "House damage claim due to disaster"
+    ],
+    "Life": [
+        "Life insurance death claim",
+        "Policy maturity claim request",
+        "Claim settlement for life policy"
+    ],
+    "Travel": [
+        "Lost baggage travel claim",
+        "Flight delay insurance claim",
+        "Travel insurance assistance required"
+    ],
+    "Fraud": [
+        "Suspicious claim investigation",
+        "Repeated claim submission detected",
+        "Possible fraudulent insurance activity"
+    ]
+}
+
+BODY_TEMPLATES = {
+    "Health": [
+        "I was hospitalized due to {illness} at {hospital}. Medical bills amounting to Rs {amount} are attached. Kindly process my health insurance claim.",
+        "Following my treatment for {illness}, I am submitting documents for reimbursement. Hospital name: {hospital}.",
+        "Please find attached my medical reports and bills for insurance claim after hospitalization."
+    ],
+    "Vehicle": [
+        "My vehicle met with an accident on {location}. The damage assessment report is attached for claim processing.",
+        "I am submitting a motor insurance claim after my car accident. FIR and repair estimate enclosed.",
+        "The vehicle was damaged due to collision. Please initiate claim settlement."
+    ],
+    "Property": [
+        "A fire incident caused severe damage to my house at {location}. Please process the property insurance claim.",
+        "Due to natural disaster, my insured property suffered damage. Survey report attached.",
+        "Requesting claim settlement for property damage caused by short circuit."
+    ],
+    "Life": [
+        "I regret to inform you about the demise of the policyholder. Kindly initiate life insurance claim settlement.",
+        "Please process the maturity claim for the life insurance policy.",
+        "Submitting death certificate and policy documents for life insurance claim."
+    ],
+    "Travel": [
+        "My baggage was lost during flight from {location}. Please register my travel insurance claim.",
+        "Due to flight delay, I incurred additional expenses. Kindly assist with insurance claim.",
+        "Requesting reimbursement under travel insurance for trip interruption."
+    ],
+    "Fraud": [
+        "This claim appears suspicious as similar claims were filed earlier for the same incident.",
+        "Multiple claims submitted with identical documents. Possible insurance fraud detected.",
+        "Unusual claim pattern observed. Investigation required before approval."
+    ]
+}
+
+ILLNESSES = ["dengue", "malaria", "covid", "fracture", "typhoid"]
+HOSPITALS = ["AIIMS Delhi", "Fortis Hospital", "Apollo Hospital", "PGIMER Chandigarh"]
+LOCATIONS = ["Delhi", "Mumbai", "Chandigarh", "Punjab", "Bangalore"]
+
+# -----------------------------
+# Email Generator
+# -----------------------------
+data = []
+
+emails_per_class = TOTAL_EMAILS // len(CLAIM_TYPES)
+
+email_id = 1
+
+for claim_type in CLAIM_TYPES:
+    for _ in range(emails_per_class):
+        subject = random.choice(SUBJECT_TEMPLATES[claim_type])
+        body_template = random.choice(BODY_TEMPLATES[claim_type])
+
+        body = body_template.format(
+            illness=random.choice(ILLNESSES),
+            hospital=random.choice(HOSPITALS),
+            location=random.choice(LOCATIONS),
+            amount=random.randint(20000, 300000)
+        )
+
+        data.append({
+            "email_id": email_id,
+            "subject": subject,
+            "email_body": body,
+            "claim_type": claim_type,
+            "urgency": random.choice(URGENCY_MAP[claim_type]),
+            "fraud_flag": FRAUD_FLAG[claim_type]
+        })
+
+        email_id += 1
+
+# -----------------------------
+# Create DataFrame & Save
+# -----------------------------
+df = pd.DataFrame(data)
+df.to_csv("insurance_claim_emails.csv", index=False)
+
+print("Dataset generated successfully!")
+print("Total emails:", len(df))
+print(df.head())
