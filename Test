@@ -1,0 +1,16 @@
+from transformers import BertTokenizerFast, BertForSequenceClassification
+import torch
+
+tokenizer = BertTokenizerFast.from_pretrained("bert_insurance_model")
+model = BertForSequenceClassification.from_pretrained("bert_insurance_model")
+
+text = """
+I was hospitalized at Apollo Hospital for dengue treatment.
+Please find attached medical bills for reimbursement.
+"""
+
+inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+outputs = model(**inputs)
+
+predicted_label = torch.argmax(outputs.logits, dim=1).item()
+print("Predicted Claim Type:", label_encoder.classes_[predicted_label])
