@@ -1,0 +1,142 @@
+import pandas as pd
+import torch
+from torch.utils.data import Dataset
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report
+
+from transformers import (
+    BertTokenizerFast,
+    BertForSequenceClassification,
+    Trainer,
+    TrainingArguments
+)
+
+# 1. Load Dataset
+
+df = pd.read_csv("insurance_claim_emails.csv")
+
+# Combine subject and body
+df["text"] = df["subject"] + " " + df["email_body"]
+
+# Encode labels
+label_encoder = LabelEncoder()
+df["label"] = label_encoder.fit_transform(df["claim_type"])
+
+num_labels = len(label_encoder.classes_)
+print("Classes:", list(label_encoder.classes_))
+
+
+# 2. Train-Test Split
+
+train_texts, test_texts, train_labels, test_labels = train_test_split(
+    df["text"].tolist(),
+    df["label"].tolist(),
+    test_size=0.2,
+    random_state=42,
+    stratify=df["label"]
+)
+
+
+# 3. Tokenizer
+
+tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+
+train_encodings = tokenizer(
+    train_texts,
+    truncation=True,
+    padding=True,
+    max_length=256
+)
+
+test_encodings = tokenizer(
+    test_texts,
+    truncation=True,
+    padding=True,
+    max_length=256
+)
+
+
+# 4. Dataset Class
+
+class InsuranceDataset(Dataset):
+    def __init__(self, encodings, labels):
+        self.encodings = encodings
+        self.labels = labels
+
+    def __getitem__(self, idx):
+        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        item["labels"] = torch.tensor(self.labels[idx])
+        return item
+
+    def __len__(self):
+        return len(self.labels)
+
+train_dataset = InsuranceDataset(train_encodings, train_labels)
+test_dataset = InsuranceDataset(test_encodings, test_labels)
+
+# 5. Load BERT Model
+
+model = BertForSequenceClassification.from_pretrained(
+    "bert-base-uncased",
+    num_labels=num_labels
+)
+
+# 6. Training Arguments
+
+training_args = TrainingArguments(
+    output_dir="./bert_insurance_output",
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    logging_dir="./logs",
+    logging_steps=100,
+    load_best_model_at_end=True,
+    metric_for_best_model="accuracy"
+)
+
+# 7. Metrics Function
+
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = pred.predictions.argmax(-1)
+    acc = accuracy_score(labels, preds)
+    return {"accuracy": acc}
+
+# 8. Trainer
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+    compute_metrics=compute_metrics,
+    tokenizer=tokenizer
+)
+
+
+# 9. Train Model
+
+trainer.train()
+
+# 10. Evaluate Model
+
+predictions = trainer.predict(test_dataset)
+y_pred = predictions.predictions.argmax(axis=1)
+
+print("\nClassification Report:\n")
+print(classification_report(test_labels, y_pred, target_names=label_encoder.classes_))
+
+
+# 11. Save Model & Tokenizer
+
+model.save_pretrained("bert_insurance_model")
+tokenizer.save_pretrained("bert_insurance_model")
+
+print("\nBERT model saved successfully.")
+
