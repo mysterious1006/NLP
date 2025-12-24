@@ -1,0 +1,75 @@
+import streamlit as st
+import torch
+from transformers import BertTokenizerFast, BertForSequenceClassification
+
+# -----------------------------------------
+# Load the saved model and tokenizer
+# -----------------------------------------
+@st.cache_resource  # This caches the model for faster reloads
+def load_model():
+    model_path = "C:\Users\HP\Desktop\NLP\final.py"  # Folder where you saved the model
+    tokenizer = BertTokenizerFast.from_pretrained(model_path)
+    model = BertForSequenceClassification.from_pretrained(model_path)
+    model.eval()  # Set to evaluation mode
+    return tokenizer, model
+
+tokenizer, model = load_model()
+
+# Get the class names (you can hardcode them if you know them in advance)
+# Example: replace with your actual classes, e.g., ['Auto', 'Health', 'Home', 'Life']
+# If you saved the label_encoder, you could load it too, but here's a placeholder:
+classes = ["Auto", "Health", "Home"]  # <-- UPDATE THIS with your actual claim types!
+
+# Streamlit UI
+st.title("🏥 Insurance Claim Type Classifier")
+st.markdown("""
+This app uses a fine-tuned BERT model to predict the type of insurance claim 
+from an email's **subject** and **body**.
+""")
+
+st.header("Enter Email Details")
+
+col1, col2 = st.columns(2)
+with col1:
+    subject = st.text_input("Subject", value="Car accident on highway")
+with col2:
+    body = st.text_area("Email Body", value="I was involved in a rear-end collision last week...", height=200)
+
+full_text = subject + " " + body
+
+if st.button("Predict Claim Type"):
+    if not full_text.strip():
+        st.warning("Please enter some text to classify.")
+    else:
+        with st.spinner("Processing..."):
+            # Tokenize input
+            inputs = tokenizer(
+                full_text,
+                truncation=True,
+                padding="max_length",
+                max_length=256,
+                return_tensors="pt"
+            )
+
+            # Inference
+            with torch.no_grad():
+                outputs = model(**inputs)
+                logits = outputs.logits
+                probabilities = torch.softmax(logits, dim=-1).squeeze().tolist()
+                predicted_idx = torch.argmax(logits, dim=-1).item()
+
+            predicted_class = classes[predicted_idx]
+            confidence = probabilities[predicted_idx]
+
+        st.success(f"**Predicted Claim Type: {predicted_class}**")
+        st.progress(confidence)
+        st.write(f"Confidence: **{confidence:.2%}**")
+
+        # Show all probabilities
+        st.subheader("All Probabilities")
+        prob_df = []
+        for i, prob in enumerate(probabilities):
+            prob_df.append({"Claim Type": classes[i], "Probability": f"{prob:.2%}"})
+        st.table(prob_df)
+
+st.caption("Model trained on insurance claim emails using BERT-base-uncased.")
